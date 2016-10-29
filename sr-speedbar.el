@@ -78,6 +78,13 @@
 ;;      M-x customize-group RET sr-speedbar RET
 
 ;;; Change log:
+;; * 28 Oct 2016:
+;;   * Panagiotis Vlantis <panagiotis.vlantis.mtc@hotmail.com>
+;;     * Make `sr-speedbar-window' deletable, as it interferes with
+;;       functionality that temporarily reconfigures the frame (e.g.,
+;;       editing of source code blocks in org-mode).
+;;     * Ensure that at most one window displays the sr-speedbar's buffer
+;;       at all times.
 ;;
 ;; * 04 Aug 2015:
 ;;   * Tamas Levai <levait@tmit.bme.hu>:
@@ -389,7 +396,11 @@ of a speedbar-window.  It will be created if necessary."
   "Create `sr-speedbar' window."
   (interactive)
   (if (not (sr-speedbar-exist-p))
-      (let ((current-window (selected-window)))
+      (let ((sr-speedbar-new-window
+	     (if (sr-speedbar-window-exist-p sr-speedbar-window)
+		 sr-speedbar-window
+	       (sr-speedbar-create-window)))
+	    (current-window (selected-window)))
         ;; Ensure only one window is there
         ;; when `sr-speedbar-delete-windows' is non-nil
         (if sr-speedbar-delete-windows
@@ -398,12 +409,9 @@ of a speedbar-window.  It will be created if necessary."
         ;; to skip `sr-speedbar' window when use `other-window'.
         (sr-speedbar-handle-other-window-advice sr-speedbar-skip-other-window-p)
         ;; Switch buffer
-        (if (sr-speedbar-buffer-exist-p speedbar-buffer)
-            (unless (sr-speedbar-window-exist-p sr-speedbar-window)
-              (sr-speedbar-get-window))
-          (if (<= (sr-speedbar-current-window-take-width) sr-speedbar-width)
+        (unless (sr-speedbar-buffer-exist-p speedbar-buffer)
+          (when (<= (sr-speedbar-current-window-take-width) sr-speedbar-width)
               (setq sr-speedbar-width sr-speedbar-default-width))
-          (sr-speedbar-get-window)             ;get `sr-speedbar' window that split current window
           (setq speedbar-buffer (get-buffer-create sr-speedbar-buffer-name)
                 speedbar-frame (selected-frame)
                 dframe-attached-frame (selected-frame)
@@ -423,10 +431,15 @@ of a speedbar-window.  It will be created if necessary."
           (add-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook t)
           ;; Add `kill-buffer-hook'.
           (add-hook 'kill-buffer-hook 'sr-speedbar-kill-buffer-hook) ;add `kill-buffer-hook'
+	  ;; Enable automatic update of `sr-speedbar-window''s value
+	  ;; when window configuration changes.
+	  (add-hook 'window-configuration-change-hook 
+		    'sr-speedbar--window-configuration-change-hook)
           ;; Auto refresh speedbar content
           ;; if option `sr-speedbar-auto-refresh' is non-nil
           (sr-speedbar-handle-auto-refresh sr-speedbar-auto-refresh))
-        (set-window-buffer sr-speedbar-window (get-buffer sr-speedbar-buffer-name))
+	(set-window-buffer sr-speedbar-new-window (get-buffer sr-speedbar-buffer-name))
+        ;; (set-window-buffer sr-speedbar-window (get-buffer sr-speedbar-buffer-name))
         (set-window-dedicated-p sr-speedbar-window t) ;make `sr-speedbar-window' dedicated to speedbar-buffer.
         (select-window current-window))
     (message "`sr-speedbar' window has exist.")))
@@ -497,23 +510,16 @@ Otherwise return nil."
              (<= win-width sr-speedbar-max-width))
         (setq sr-speedbar-width win-width))))
 
-(defun sr-speedbar-get-window ()
-  "Get `sr-speedbar' window."
-  (let ((current-window (selected-window))
-        ;; Get split new window.
-        (new-window (split-window
-                     (selected-window)
-                     (if sr-speedbar-right-side
-                         (- (sr-speedbar-current-window-take-width) sr-speedbar-width)
-                       sr-speedbar-width)
-                     t)))
-    ;; Select split window.
-    (setq sr-speedbar-window
-          (if sr-speedbar-right-side
-              ;; Select right window when `sr-speedbar-right-side' is enable.
-              new-window
-            ;; Otherwise select left widnow.
-            current-window))))
+(defun sr-speedbar-create-window (&optional base-window)
+  "Get `sr-speedbar' window.
+Create a suitable window, by splitting the base-window, and
+store that window to `sr-speedbar-window'.
+If base-window is nil, it defaults to current frame's root window."
+  (or base-window (setq base-window (frame-root-window)))
+  (let* ((side (if sr-speedbar-right-side 'right 'left))
+	 (width (- sr-speedbar-width)))
+    ;; Return new split window.
+    (split-window base-window width side)))
 
 (defun sr-speedbar-before-visiting-file-hook ()
   "Function that hook `speedbar-before-visiting-file-hook'."
@@ -542,6 +548,20 @@ Otherwise return nil."
     (remove-hook 'speedbar-before-visiting-tag-hook 'sr-speedbar-before-visiting-tag-hook)
     (remove-hook 'speedbar-visiting-file-hook 'sr-speedbar-visiting-file-hook)
     (remove-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook)))
+
+(defun sr-speedbar--window-configuration-change-hook ()
+  "Automatically detect when the sr-speedbar buffer 
+is assigned to or unassigned from a window,
+and update the value of the elisp parameter `sr-speedbar-window'.
+
+Along with the advice `sr-speedbar--set-window-buffer--advice',
+it ensures that at most one window displays the sr-speedbar's buffer.
+
+This function should be added to `window-configuration-change-hook'."
+  (if sr-speedbar-window
+      (when (not (window-live-p sr-speedbar-window))
+	(setq sr-speedbar-window nil))
+    (setq sr-speedbar-window (get-buffer-window sr-speedbar-buffer-name))))
 
 (defun sr-speedbar-refresh ()
   "Refresh the context of speedbar."
@@ -593,46 +613,68 @@ Otherwise return nil."
   (and buffer (buffer-live-p buffer)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Advices ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defadvice delete-other-windows (around sr-speedbar-delete-other-window-advice activate)
-  "This advice to make `sr-speedbar' window can't deleted by command `delete-other-windows'."
-  (let ((sr-speedbar-active-p (sr-speedbar-window-exist-p sr-speedbar-window)))
-    (if sr-speedbar-active-p
-        (let ((current-window (selected-window)))
-          (dolist (win (window-list))
-            (when (and (window-live-p win)
-                       (not (eq current-window win))
-                       (not (window-dedicated-p win)))
-              (delete-window win))))
-      ad-do-it)))
 
-(defadvice delete-window (before sr-speedbar-delete-window-advice activate)
-  "This advice to remember `sr-speedbar' window width before deleted.
-Use `delete-window' delete `sr-speedbar' window have same effect as `sr-speedbar-close'."
-  ;; Remember window width before deleted.
-  (sr-speedbar-remember-window-width))
+;; (defun sr-speedbar--switch-to-buffer-advice 
+;;     (buffer-or-name &optional norecord force-same-window)
+;;   (let ((window (selected-window))
+;; 	(sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
+;; 	(new-buffer (get-buffer buffer-or-name)))
+;;     (and sr-speedbar-buffer
+;; 	 (if (eq new-buffer sr-speedbar-buffer) 
+;; 	     (if sr-speedbar-window nil t)
+;; 	   t))))
+;; (advice-add 'switch-to-buffer :before-while 
+;; 	    'sr-speedbar--switch-to-buffer-advice)
 
-(defadvice pop-to-buffer (before sr-speedbar-pop-to-buffer-advice activate)
-  "This advice is to fix `pop-to-buffer' problem with dedicated window.
-Default, function `display-buffer' can't display buffer in select window
-if current window is `dedicated'.
+(defun sr-speedbar--set-window-buffer--advice 
+    (window buffer-or-name &optional keep-margins)
+    "Ensure that at most one window displays the sr-speedbar's buffer.
 
-So function `display-buffer' conflict with `sr-speedbar' window, because
-`sr-speedbar' window is `dedicated' window.
+This is accomplished by throwing an error when trying to 
+set the buffer of another window to sr-speedbar's while 
+another window is already displaying it.
 
-That is to say, when current frame just have one `non-dedicated' window,
-any functions that use `display-buffer' can't split windows
-to display buffer, even option `pop-up-windows' is enable.
+Along with the `sr-speedbar--window-configuration-change-hook',
+they ensure that at most one window displays the sr-speedbar's buffer.
 
-And the example function that can occur above problem is `pop-to-buffer'."
-  (when (and pop-up-windows                            ;`pop-up-windows' is enable
-             (sr-speedbar-window-dedicated-only-one-p) ;just have one `non-dedicated' window
-             (sr-speedbar-window-exist-p sr-speedbar-window)
-             (not (sr-speedbar-window-p)) ;not in `sr-speedbar' window
-             (if (featurep 'helm)
-		 (not helm-alive-p)
-	       t))
-    (split-window-vertically)
-    (windmove-down)))
+This function should advise `set-window-buffer'."
+  (let ((sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
+	(new-buffer (get-buffer buffer-or-name)))
+    (and sr-speedbar-buffer
+	 (when (and sr-speedbar-window (eq new-buffer sr-speedbar-buffer))
+	     (error "another sr-speedbar window exists")))))
+(advice-add 'set-window-buffer :before
+	    'sr-speedbar--set-window-buffer--advice)
+
+(defun sr-speedbar--delete-window--advice (&optional window)
+  "Save `sr-speedbar-window''s size before killing it."
+  (setq window (or window (selected-window)))
+  (when (eq window sr-speedbar-window)
+    (sr-speedbar-remember-window-width)))
+(advice-add 'delete-window :before 'sr-speedbar--delete-window--advice)
+
+;; (defadvice pop-to-buffer (before sr-speedbar-pop-to-buffer-advice activate)
+;;   "This advice is to fix `pop-to-buffer' problem with dedicated window.
+;; Default, function `display-buffer' can't display buffer in select window
+;; if current window is `dedicated'.
+
+;; So function `display-buffer' conflict with `sr-speedbar' window, because
+;; `sr-speedbar' window is `dedicated' window.
+
+;; That is to say, when current frame just have one `non-dedicated' window,
+;; any functions that use `display-buffer' can't split windows
+;; to display buffer, even option `pop-up-windows' is enable.
+
+;; And the example function that can occur above problem is `pop-to-buffer'."
+;;   (when (and pop-up-windows                            ;`pop-up-windows' is enable
+;;              (sr-speedbar-window-dedicated-only-one-p) ;just have one `non-dedicated' window
+;;              (sr-speedbar-window-exist-p sr-speedbar-window)
+;;              (not (sr-speedbar-window-p)) ;not in `sr-speedbar' window
+;;              (if (featurep 'helm)
+;; 		 (not helm-alive-p)
+;; 	       t))
+;;     (split-window-vertically)
+;;     (windmove-down)))
 
 (defadvice other-window (after sr-speedbar-other-window-advice)
   "Default, can use `other-window' select window in cyclic ordering of windows.
