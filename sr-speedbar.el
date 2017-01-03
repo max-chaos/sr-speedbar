@@ -387,7 +387,7 @@ or the last width when visible.
 Use this function to create or toggle visibility
 of a speedbar-window.  It will be created if necessary."
   (interactive)
-  (if (sr-speedbar-exist-p)
+  (if (sr-speedbar-window-exists-p)
       (sr-speedbar-close)
     (sr-speedbar-open)))
 
@@ -395,31 +395,31 @@ of a speedbar-window.  It will be created if necessary."
 (defun sr-speedbar-open ()
   "Create `sr-speedbar' window."
   (interactive)
-  (if (not (sr-speedbar-exist-p))
+  (if (not (sr-speedbar-window-exists-p))
       (let ((sr-speedbar-new-window
-	     (if (sr-speedbar-window-exist-p sr-speedbar-window)
-		 sr-speedbar-window
-	       (sr-speedbar-create-window)))
+	     (or (sr-speedbar-window) (sr-speedbar-create-window)))
 	    (current-window (selected-window)))
         ;; Ensure only one window is there
-        ;; when `sr-speedbar-delete-windows' is non-nil
-        (if sr-speedbar-delete-windows
-            (delete-other-windows))
+        ;; when `sr-speedbar-delete-windows' is non-nil.
+        (when sr-speedbar-delete-windows (delete-other-windows))
         ;; Whether activate `other-window' advice
         ;; to skip `sr-speedbar' window when use `other-window'.
         (sr-speedbar-handle-other-window-advice sr-speedbar-skip-other-window-p)
         ;; Switch buffer
-        (unless (sr-speedbar-buffer-exist-p speedbar-buffer)
+        (unless (sr-speedbar-buffer-exists-p)
           (when (<= (sr-speedbar-current-window-take-width) sr-speedbar-width)
-              (setq sr-speedbar-width sr-speedbar-default-width))
+	    (setq sr-speedbar-width sr-speedbar-default-width))
           (setq speedbar-buffer (get-buffer-create sr-speedbar-buffer-name)
                 speedbar-frame (selected-frame)
                 dframe-attached-frame (selected-frame)
                 speedbar-select-frame-method 'attached
-                speedbar-verbosity-level 0 ;don't say anything, i don't like ... :)
+		;; Keep verbosity down to a minimum.
+                speedbar-verbosity-level 0
                 speedbar-last-selected-file nil)
           (set-buffer speedbar-buffer)
-          (buffer-disable-undo speedbar-buffer) ;make disable in speedbar buffer, otherwise will occur `undo-outer-limit' error
+	  ;; Disable undo in speedbar buffer,
+	  ;; otherwise an `undo-outer-limit' error may occur.
+          (buffer-disable-undo speedbar-buffer)
           (speedbar-mode)
           (speedbar-reconfigure-keymaps)
           (speedbar-update-contents)
@@ -430,24 +430,26 @@ of a speedbar-window.  It will be created if necessary."
           (add-hook 'speedbar-visiting-file-hook 'sr-speedbar-visiting-file-hook t)
           (add-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook t)
           ;; Add `kill-buffer-hook'.
-          (add-hook 'kill-buffer-hook 'sr-speedbar-kill-buffer-hook) ;add `kill-buffer-hook'
+          (add-hook 'kill-buffer-hook 'sr-speedbar-kill-buffer-hook)
 	  ;; Enable automatic update of `sr-speedbar-window''s value
 	  ;; when window configuration changes.
-	  (add-hook 'window-configuration-change-hook 
-		    'sr-speedbar--window-configuration-change-hook)
+          ;;(add-hook 'window-configuration-change-hook
+          ;;          'sr-speedbar--window-configuration-change-hook)
           ;; Auto refresh speedbar content
           ;; if option `sr-speedbar-auto-refresh' is non-nil
           (sr-speedbar-handle-auto-refresh sr-speedbar-auto-refresh))
+	;; Dedicate `sr-speedbar-window' to speedbar-buffer.
 	(set-window-buffer sr-speedbar-new-window (get-buffer sr-speedbar-buffer-name))
-        ;; (set-window-buffer sr-speedbar-window (get-buffer sr-speedbar-buffer-name))
-        (set-window-dedicated-p sr-speedbar-window t) ;make `sr-speedbar-window' dedicated to speedbar-buffer.
+        (set-window-dedicated-p sr-speedbar-new-window t)
+	;; Switch to initially selected window.
         (select-window current-window))
-    (message "`sr-speedbar' window has exist.")))
+    (message "`sr-speedbar' has been created.")))
 
+;;;###autoload
 (defun sr-speedbar-close ()
   "Close `sr-speedbar' window and save window width."
   (interactive)
-  (if (sr-speedbar-exist-p)
+  (if (sr-speedbar-window-exists-p)
       (let ((current-window (selected-window)))
         ;; Remember window width.
         (sr-speedbar-select-window)
@@ -460,17 +462,15 @@ of a speedbar-window.  It will be created if necessary."
               (ecb-deactivate)
               (ecb-activate))
           ;; Otherwise delete dedicated window.
-          (delete-window sr-speedbar-window)
-          (if (sr-speedbar-window-exist-p current-window)
-              (select-window current-window))))
-    (message "`sr-speedbar' window is not exist.")))
+          (delete-window (sr-speedbar-window))))
+    (message "`sr-speedbar' has been killed.")))
 
 (defun sr-speedbar-select-window ()
   "Force the windows that contain `sr-speedbar'."
   (interactive)
-  (if (sr-speedbar-exist-p)
-      (select-window sr-speedbar-window)
-    (message "`sr-speedbar' window is not exist.")))
+  (if (sr-speedbar-window-exists-p)
+      (select-window (sr-speedbar-window))
+    (message "`sr-speedbar' window does not exist.")))
 
 (defun sr-speedbar-refresh-turn-on ()
   "Turn on refresh content automatically."
@@ -490,36 +490,33 @@ of a speedbar-window.  It will be created if necessary."
   (setq sr-speedbar-auto-refresh (not sr-speedbar-auto-refresh))
   (sr-speedbar-handle-auto-refresh sr-speedbar-auto-refresh t))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; utilise functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun sr-speedbar-exist-p ()
-  "Return `non-nil' if `sr-speedbar' is exist.
-Otherwise return nil."
-  (and (sr-speedbar-buffer-exist-p speedbar-buffer)
-       (sr-speedbar-window-exist-p sr-speedbar-window)))
-
-(defun sr-speedbar-window-p ()
-  "Return `non-nil' if current window is `sr-speedbar' window.
-Otherwise return nil."
-  (equal sr-speedbar-buffer-name (buffer-name (window-buffer))))
-
-(defun sr-speedbar-remember-window-width ()
-  "Remember window width."
-  (let ((win-width (sr-speedbar-current-window-take-width)))
-    (if (and (sr-speedbar-window-p)
-             (> win-width 1)
-             (<= win-width sr-speedbar-max-width))
-        (setq sr-speedbar-width win-width))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; utility functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun sr-speedbar-window ()
+  "Return window displaying the speedbar buffer"
+  (get-buffer-window sr-speedbar-buffer-name))
 
 (defun sr-speedbar-create-window (&optional base-window)
   "Get `sr-speedbar' window.
-Create a suitable window, by splitting the base-window, and
-store that window to `sr-speedbar-window'.
-If base-window is nil, it defaults to current frame's root window."
+Create and return a suitable window by splitting the base-window.
+If base-window is nil, the current frame's root window will be split instead."
   (or base-window (setq base-window (frame-root-window)))
   (let* ((side (if sr-speedbar-right-side 'right 'left))
 	 (width (- sr-speedbar-width)))
     ;; Return new split window.
     (split-window base-window width side)))
+
+(defun sr-speedbar-current-window-p ()
+  "Return `non-nil' if current window is `sr-speedbar' window.
+Otherwise return nil."
+  (string= sr-speedbar-buffer-name (buffer-name (window-buffer))))
+
+(defun sr-speedbar-remember-window-width ()
+  "Remember window width."
+  (let ((win-width (sr-speedbar-current-window-take-width)))
+    (if (and (sr-speedbar-current-window-p)
+             (> win-width 1)
+             (<= win-width sr-speedbar-max-width))
+        (setq sr-speedbar-width win-width))))
 
 (defun sr-speedbar-before-visiting-file-hook ()
   "Function that hook `speedbar-before-visiting-file-hook'."
@@ -549,24 +546,24 @@ If base-window is nil, it defaults to current frame's root window."
     (remove-hook 'speedbar-visiting-file-hook 'sr-speedbar-visiting-file-hook)
     (remove-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook)))
 
-(defun sr-speedbar--window-configuration-change-hook ()
-  "Automatically detect when the sr-speedbar buffer 
-is assigned to or unassigned from a window,
-and update the value of the elisp parameter `sr-speedbar-window'.
-
-Along with the advice `sr-speedbar--set-window-buffer--advice',
-it ensures that at most one window displays the sr-speedbar's buffer.
-
-This function should be added to `window-configuration-change-hook'."
-  (if sr-speedbar-window
-      (when (not (window-live-p sr-speedbar-window))
-	(setq sr-speedbar-window nil))
-    (setq sr-speedbar-window (get-buffer-window sr-speedbar-buffer-name))))
+;; (defun sr-speedbar--window-configuration-change-hook ()
+;;   "Automatically detect when the sr-speedbar buffer
+;; is assigned to or unassigned from a window,
+;; and update the value of the elisp parameter `sr-speedbar-window'.
+;;
+;; Along with the advice `sr-speedbar--set-window-buffer--advice',
+;; it ensures that at most one window displays the sr-speedbar's buffer.
+;;
+;; This function should be added to `window-configuration-change-hook'."
+;;   (if sr-speedbar-window
+;;       (when (not (window-live-p sr-speedbar-window))
+;; 	(setq sr-speedbar-window nil))
+;;     (setq sr-speedbar-window (get-buffer-window sr-speedbar-buffer-name))))
 
 (defun sr-speedbar-refresh ()
   "Refresh the context of speedbar."
   (when (and (not (equal default-directory sr-speedbar-last-refresh-dictionary)) ;if directory is change
-             (not (sr-speedbar-window-p))) ;and is not in speedbar buffer
+             (not (sr-speedbar-current-window-p))) ;and is not in speedbar buffer
     (setq sr-speedbar-last-refresh-dictionary default-directory)
     (speedbar-refresh)))
 
@@ -602,15 +599,13 @@ If WINDOW is nil, get current window."
              (= (- window-number dedicated-window-number) 1))
         t nil)))
 
-(defun sr-speedbar-window-exist-p (window)
-  "Return `non-nil' if WINDOW is exist.
-Otherwise return nil."
-  (and window (window-live-p window)))
+(defun sr-speedbar-window-exists-p ()
+  "Return `non-nil' if sr-speedbar window exists, otherwise return nil."
+  (window-live-p (sr-speedbar-window)))
 
-(defun sr-speedbar-buffer-exist-p (buffer)
-  "Return `non-nil' if BUFFER is exist.
-Otherwise return nil."
-  (and buffer (buffer-live-p buffer)))
+(defun sr-speedbar-buffer-exists-p ()
+  "Return non-nil if `speedbar-buffer' exists, otherwise return nil."
+  (buffer-live-p speedbar-buffer))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Advices ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -628,7 +623,7 @@ Otherwise return nil."
 
 (defun sr-speedbar--set-window-buffer--advice 
     (window buffer-or-name &optional keep-margins)
-    "Ensure that at most one window displays the sr-speedbar's buffer.
+  "Ensure that at most one window displays the sr-speedbar's buffer.
 
 This is accomplished by throwing an error when trying to 
 set the buffer of another window to sr-speedbar's while 
@@ -641,15 +636,15 @@ This function should advise `set-window-buffer'."
   (let ((sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
 	(new-buffer (get-buffer buffer-or-name)))
     (and sr-speedbar-buffer
-	 (when (and sr-speedbar-window (eq new-buffer sr-speedbar-buffer))
-	     (error "another sr-speedbar window exists")))))
+	 (when (and (sr-speedbar-window) (eq new-buffer sr-speedbar-buffer))
+	   (error "another sr-speedbar window exists")))))
 (advice-add 'set-window-buffer :before
 	    'sr-speedbar--set-window-buffer--advice)
 
 (defun sr-speedbar--delete-window--advice (&optional window)
   "Save `sr-speedbar-window''s size before killing it."
   (setq window (or window (selected-window)))
-  (when (eq window sr-speedbar-window)
+  (when (eq window (sr-speedbar-window))
     (sr-speedbar-remember-window-width)))
 (advice-add 'delete-window :before 'sr-speedbar--delete-window--advice)
 
@@ -669,7 +664,7 @@ This function should advise `set-window-buffer'."
 ;;   (when (and pop-up-windows                            ;`pop-up-windows' is enable
 ;;              (sr-speedbar-window-dedicated-only-one-p) ;just have one `non-dedicated' window
 ;;              (sr-speedbar-window-exist-p sr-speedbar-window)
-;;              (not (sr-speedbar-window-p)) ;not in `sr-speedbar' window
+;;              (not (sr-speedbar-current-window-p)) ;not in `sr-speedbar' window
 ;;              (if (featurep 'helm)
 ;; 		 (not helm-alive-p)
 ;; 	       t))
@@ -683,8 +678,7 @@ Just want make `sr-speedbar' window as a view sidebar.
 
 This advice can make `other-window' skip `sr-speedbar' window."
   (let ((count (or (ad-get-arg 0) 1)))
-    (when (and (sr-speedbar-window-exist-p sr-speedbar-window)
-               (eq sr-speedbar-window (selected-window)))
+    (when (sr-speedbar-current-window-p)
       (other-window count))))
 
 (provide 'sr-speedbar)
