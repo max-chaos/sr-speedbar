@@ -499,12 +499,12 @@ of a speedbar-window.  It will be created if necessary."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; utility functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun sr-speedbar-window ()
-  "Return window displaying the speedbar buffer"
+  "Return window displaying the speedbar buffer."
   (get-buffer-window sr-speedbar-buffer-name))
 
 (defun sr-speedbar-create-window (&optional base-window)
   "Get `sr-speedbar' window.
-Create and return a suitable window by splitting the base-window.
+Create and return a suitable window by splitting BASE-WINDOW.
 If base-window is nil, the current frame's root window will be split instead."
   (or base-window (setq base-window (frame-root-window)))
   (let* ((side (if sr-speedbar-right-side 'right 'left))
@@ -628,13 +628,13 @@ If WINDOW is nil, get current window."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Advices ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (defun sr-speedbar--switch-to-buffer-advice 
+;; (defun sr-speedbar--switch-to-buffer-advice
 ;;     (buffer-or-name &optional norecord force-same-window)
 ;;   (let ((window (selected-window))
 ;; 	(sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
 ;; 	(new-buffer (get-buffer buffer-or-name)))
 ;;     (and sr-speedbar-buffer
-;; 	 (if (eq new-buffer sr-speedbar-buffer) 
+;; 	 (if (eq new-buffer sr-speedbar-buffer)
 ;; 	     (if sr-speedbar-window nil t)
 ;; 	   t))))
 ;; (advice-add 'switch-to-buffer :before-while 
@@ -656,7 +656,7 @@ This function should advise `set-window-buffer'."
 	(new-buffer (get-buffer buffer-or-name)))
     (and sr-speedbar-buffer
 	 (when (and (sr-speedbar-window) (eq new-buffer sr-speedbar-buffer))
-	   (error "another sr-speedbar window exists")))))
+	   (error "Another sr-speedbar window exists")))))
 (advice-add 'set-window-buffer :before
 	    'sr-speedbar--set-window-buffer--advice)
 
