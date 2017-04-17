@@ -700,6 +700,19 @@ This advice can make `other-window' skip `sr-speedbar' window."
     (when (sr-speedbar-current-window-p)
       (other-window count))))
 
+(defun speedbar--inhibit-update--advice (&rest args)
+  "Prevent update of speedbar's contents under certain circumstances.
+
+This function is supposed to advice the command `speedbar-timer-fn', and thus
+requires no arguments (i.e., ARGS is not used in any way).
+
+Such cases are:
+* while in minibuffer, do not display minibuffer's current working directory
+  as they may not be readily accessible (e.g., 
+  in the middle of establishing a connection using TRAMP)"
+  (not (minibufferp)))
+(advice-add 'speedbar-timer-fn :before-while 'speedbar--inhibit-update--advice)
+
 (provide 'sr-speedbar)
 
 ;;; sr-speedbar.el ends here
