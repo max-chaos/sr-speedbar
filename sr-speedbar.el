@@ -429,6 +429,8 @@ of a speedbar-window.  It will be created if necessary."
           (add-hook 'speedbar-before-visiting-tag-hook 'sr-speedbar-before-visiting-tag-hook t)
           (add-hook 'speedbar-visiting-file-hook 'sr-speedbar-visiting-file-hook t)
           (add-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook t)
+	  ;; Add window configuration related hooks.
+          (add-hook 'window-configuration-change-hook 'sr-speedbar-window-size-change-hook)
           ;; Add `kill-buffer-hook'.
           (add-hook 'kill-buffer-hook 'sr-speedbar-kill-buffer-hook)
 	  ;; Enable automatic update of `sr-speedbar-window''s value
@@ -517,11 +519,13 @@ Otherwise return nil."
 
 (defun sr-speedbar-remember-window-width ()
   "Remember window width."
-  (let ((win-width (sr-speedbar-current-window-take-width)))
-    (if (and (sr-speedbar-current-window-p)
-             (> win-width 1)
-             (<= win-width sr-speedbar-max-width))
-        (setq sr-speedbar-width win-width))))
+  (when (sr-speedbar-current-window-p)
+    (let ((win-width (sr-speedbar-current-window-take-width)))
+      (if (> win-width 1)
+	  (if (<= win-width sr-speedbar-max-width)
+	      (setq sr-speedbar-width win-width)
+	    (setq sr-speedbar-width sr-speedbar-max-width))
+	(setq sr-speedbar-width sr-speedbar-default-width)))))
 
 (defun sr-speedbar-before-visiting-file-hook ()
   "Function that hook `speedbar-before-visiting-file-hook'."
@@ -550,6 +554,16 @@ Otherwise return nil."
     (remove-hook 'speedbar-before-visiting-tag-hook 'sr-speedbar-before-visiting-tag-hook)
     (remove-hook 'speedbar-visiting-file-hook 'sr-speedbar-visiting-file-hook)
     (remove-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook)))
+
+(defun sr-speedbar-window-size-change-hook ()
+  "Ensure that the size of the sr-speedbar window is within specified limits."
+  (when (sr-speedbar-window-exists-p)
+    (save-selected-window
+      (select-window (sr-speedbar-window))
+      (let ((win-width (sr-speedbar-current-window-take-width)))
+	(when (>= win-width sr-speedbar-max-width)
+	  ;; (window-resize nil 0 (- sr-speedbar-max-width win-width)))))))
+	  (shrink-window-horizontally (- win-width sr-speedbar-max-width)))))))
 
 ;; (defun sr-speedbar--window-configuration-change-hook ()
 ;;   "Automatically detect when the sr-speedbar buffer
