@@ -438,9 +438,14 @@ of a speedbar-window.  It will be created if necessary."
           ;; Auto refresh speedbar content
           ;; if option `sr-speedbar-auto-refresh' is non-nil
           (sr-speedbar-handle-auto-refresh sr-speedbar-auto-refresh))
-	;; Dedicate `sr-speedbar-window' to speedbar-buffer.
 	(set-window-buffer sr-speedbar-new-window (get-buffer sr-speedbar-buffer-name))
-        (set-window-dedicated-p sr-speedbar-new-window t)
+	;; Dedicate `sr-speedbar-window' to speedbar-buffer.
+	;; 
+	;; In the end, do not make this window dedicated as
+	;; Emacs' window splitting mechanism behaves peculiarly
+	;; when dedicated windows are present.
+	;; 
+        ;;(set-window-dedicated-p sr-speedbar-new-window t)
 	;; Switch to initially selected window.
         (select-window current-window))
     (message "`sr-speedbar' has been created.")))
