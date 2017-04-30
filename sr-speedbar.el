@@ -397,8 +397,8 @@ of a speedbar-window.  It will be created if necessary."
   (interactive)
   (if (not (sr-speedbar-window-exists-p))
       (let ((sr-speedbar-new-window
-	     (or (sr-speedbar-window) (sr-speedbar-create-window)))
-	    (current-window (selected-window)))
+             (or (sr-speedbar-window) (sr-speedbar-create-window)))
+            (current-window (selected-window)))
         ;; Ensure only one window is there
         ;; when `sr-speedbar-delete-windows' is non-nil.
         (when sr-speedbar-delete-windows (delete-other-windows))
@@ -413,12 +413,12 @@ of a speedbar-window.  It will be created if necessary."
                 speedbar-frame (selected-frame)
                 dframe-attached-frame (selected-frame)
                 speedbar-select-frame-method 'attached
-		;; Keep verbosity down to a minimum.
+                ;; Keep verbosity down to a minimum.
                 speedbar-verbosity-level 0
                 speedbar-last-selected-file nil)
           (set-buffer speedbar-buffer)
-	  ;; Disable undo in speedbar buffer,
-	  ;; otherwise an `undo-outer-limit' error may occur.
+          ;; Disable undo in speedbar buffer,
+          ;; otherwise an `undo-outer-limit' error may occur.
           (buffer-disable-undo speedbar-buffer)
           (speedbar-mode)
           (speedbar-reconfigure-keymaps)
@@ -429,12 +429,12 @@ of a speedbar-window.  It will be created if necessary."
           (add-hook 'speedbar-before-visiting-tag-hook 'sr-speedbar-before-visiting-tag-hook t)
           (add-hook 'speedbar-visiting-file-hook 'sr-speedbar-visiting-file-hook t)
           (add-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook t)
-	  ;; Add window configuration related hooks.
+          ;; Add window configuration related hooks.
           (add-hook 'window-configuration-change-hook 'sr-speedbar-window-size-change-hook)
           ;; Add `kill-buffer-hook'.
           (add-hook 'kill-buffer-hook 'sr-speedbar-kill-buffer-hook)
-	  ;; Enable automatic update of `sr-speedbar-window''s value
-	  ;; when window configuration changes.
+          ;; Enable automatic update of `sr-speedbar-window''s value
+          ;; when window configuration changes.
           ;;(add-hook 'window-configuration-change-hook
           ;;          'sr-speedbar--window-configuration-change-hook)
           ;; Auto refresh speedbar content
@@ -513,7 +513,7 @@ Create and return a suitable window by splitting BASE-WINDOW.
 If base-window is nil, the current frame's root window will be split instead."
   (or base-window (setq base-window (frame-root-window)))
   (let* ((side (if sr-speedbar-right-side 'right 'left))
-	 (width (- sr-speedbar-width)))
+         (width (- sr-speedbar-width)))
     ;; Return new split window.
     (split-window base-window width side)))
 
@@ -527,10 +527,10 @@ Otherwise return nil."
   (when (sr-speedbar-current-window-p)
     (let ((win-width (sr-speedbar-get-window-width)))
       (if (> win-width 1)
-	  (if (<= win-width sr-speedbar-max-width)
-	      (setq sr-speedbar-width win-width)
-	    (setq sr-speedbar-width sr-speedbar-max-width))
-	(setq sr-speedbar-width sr-speedbar-default-width)))))
+          (if (<= win-width sr-speedbar-max-width)
+              (setq sr-speedbar-width win-width)
+            (setq sr-speedbar-width sr-speedbar-max-width))
+        (setq sr-speedbar-width sr-speedbar-default-width)))))
 
 (defun sr-speedbar-before-visiting-file-hook ()
   "Function that hook `speedbar-before-visiting-file-hook'."
@@ -583,7 +583,7 @@ Otherwise return nil."
 ;; This function should be added to `window-configuration-change-hook'."
 ;;   (if sr-speedbar-window
 ;;       (when (not (window-live-p sr-speedbar-window))
-;; 	(setq sr-speedbar-window nil))
+;;      (setq sr-speedbar-window nil))
 ;;     (setq sr-speedbar-window (get-buffer-window sr-speedbar-buffer-name))))
 
 (defun sr-speedbar-refresh ()
@@ -662,14 +662,14 @@ If WINDOW is nil, return the width of the current window."
 ;; (defun sr-speedbar--switch-to-buffer-advice
 ;;     (buffer-or-name &optional norecord force-same-window)
 ;;   (let ((window (selected-window))
-;; 	(sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
-;; 	(new-buffer (get-buffer buffer-or-name)))
+;;      (sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
+;;      (new-buffer (get-buffer buffer-or-name)))
 ;;     (and sr-speedbar-buffer
-;; 	 (if (eq new-buffer sr-speedbar-buffer)
-;; 	     (if sr-speedbar-window nil t)
-;; 	   t))))
-;; (advice-add 'switch-to-buffer :before-while 
-;; 	    'sr-speedbar--switch-to-buffer-advice)
+;;       (if (eq new-buffer sr-speedbar-buffer)
+;;           (if sr-speedbar-window nil t)
+;;         t))))
+;; (advice-add 'switch-to-buffer :before-while
+;;          'sr-speedbar--switch-to-buffer-advice)
 
 (defun sr-speedbar--set-window-buffer--advice (args)
   "Ensure that at most one window displays the sr-speedbar's buffer.
@@ -701,7 +701,13 @@ packed in a list passed to ARGS."
             'sr-speedbar--set-window-buffer--advice)
 
 (defun sr-speedbar--delete-window--advice (&optional window)
-  "Save `sr-speedbar-window''s size before killing it."
+  "Save `sr-speedbar-window''s size before killing it.
+
+If WINDOW is being killed while displaying the speedbar buffer,
+store the current width of the window to `sr-speedbar-width'.
+
+This function should advice `delete-window' before it is executed and thus
+expects the same arguments as it."
   (setq window (or window (selected-window)))
   (when (eq window (sr-speedbar-window))
     (sr-speedbar-remember-window-width)))
@@ -725,8 +731,8 @@ packed in a list passed to ARGS."
 ;;              (sr-speedbar-window-exist-p sr-speedbar-window)
 ;;              (not (sr-speedbar-current-window-p)) ;not in `sr-speedbar' window
 ;;              (if (featurep 'helm)
-;; 		 (not helm-alive-p)
-;; 	       t))
+;;               (not helm-alive-p)
+;;             t))
 ;;     (split-window-vertically)
 ;;     (windmove-down)))
 
@@ -748,7 +754,7 @@ requires no arguments (i.e., ARGS is not used in any way).
 
 Such cases are:
 * while in minibuffer, do not display minibuffer's current working directory
-  as they may not be readily accessible (e.g., 
+  as they may not be readily accessible (e.g.,
   in the middle of establishing a connection using TRAMP)"
   (not (minibufferp)))
 (advice-add 'speedbar-timer-fn :before-while 'speedbar--inhibit-update--advice)
