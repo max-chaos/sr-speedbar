@@ -458,24 +458,8 @@ of a speedbar-window.  It will be created if necessary."
 (defun sr-speedbar-close ()
   "Close `sr-speedbar' window and save window width."
   (interactive)
-  (if (sr-speedbar-window-exists-p)
-      (let ((current-window (selected-window)))
-        ;; Remember window width.
-        (sr-speedbar-select-window)
-        (sr-speedbar-remember-window-width)
-        ;; Close window.
-        (if (and (require 'ecb nil t)
-                 ecb-activated-window-configuration)
-            ;; Toggle ECB window when ECB window activated.
-            (progn
-              (ecb-deactivate)
-              (ecb-activate))
-          ;; Otherwise delete dedicated window.
-          (delete-window (sr-speedbar-window)))
-        ;; No point in keeping the buffer alive
-        ;; (user may accidentally switch to it in a non-dedicated window).
-        (kill-buffer sr-speedbar-buffer-name))
-    (message "`sr-speedbar' has been killed.")))
+  (delete-window (sr-speedbar-window))
+  (message "`sr-speedbar' has been killed."))
 
 (defun sr-speedbar-select-window ()
   "Force the windows that contain `sr-speedbar'."
@@ -700,18 +684,24 @@ packed in a list passed to ARGS."
 (advice-add 'set-window-buffer :filter-args
             'sr-speedbar--set-window-buffer--advice)
 
-(defun sr-speedbar--delete-window--advice (&optional window)
+(defun sr-speedbar--delete-window--advice (original &optional window)
   "Save `sr-speedbar-window''s size before killing it.
 
 If WINDOW is being killed while displaying the speedbar buffer,
 store the current width of the window to `sr-speedbar-width'.
 
-This function should advice `delete-window' before it is executed and thus
-expects the same arguments as it."
-  (setq window (or window (selected-window)))
-  (when (eq window (sr-speedbar-window))
-    (sr-speedbar-remember-window-width)))
-(advice-add 'delete-window :before 'sr-speedbar--delete-window--advice)
+This function should advice `delete-window' by surrounding it and thus
+expects the original function ORIGINAL followed by its arguments."
+  (let (win)
+    (setq win (or window (selected-window)))
+    (when (eq win (sr-speedbar-window))
+      (sr-speedbar-remember-window-width)
+      (apply original (list window))
+      ;; No point in keeping the buffer alive
+      ;; (user may accidentally switch to it in a non-dedicated window).
+      (kill-buffer sr-speedbar-buffer-name)))
+  )
+(advice-add 'delete-window :around 'sr-speedbar--delete-window--advice)
 
 ;; (defadvice pop-to-buffer (before sr-speedbar-pop-to-buffer-advice activate)
 ;;   "This advice is to fix `pop-to-buffer' problem with dedicated window.
