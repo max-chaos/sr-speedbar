@@ -395,6 +395,9 @@ of a speedbar-window.  It will be created if necessary."
 (defun sr-speedbar-open ()
   "Create `sr-speedbar' window."
   (interactive)
+  ;; Toggle ECB window when ECB window activated.
+  (when (and (featurep 'ecb) ecb-activated-window-configuration)
+    (error "Module sr-speedbar has been disabled while ECB is on"))
   (if (not (sr-speedbar-window-exists-p))
       (let ((sr-speedbar-new-window
              (or (sr-speedbar-window) (sr-speedbar-create-window)))
