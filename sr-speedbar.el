@@ -471,7 +471,10 @@ of a speedbar-window.  It will be created if necessary."
               (ecb-deactivate)
               (ecb-activate))
           ;; Otherwise delete dedicated window.
-          (delete-window (sr-speedbar-window))))
+          (delete-window (sr-speedbar-window)))
+        ;; No point in keeping the buffer alive
+        ;; (user may accidentally switch to it in a non-dedicated window).
+        (kill-buffer sr-speedbar-buffer-name))
     (message "`sr-speedbar' has been killed.")))
 
 (defun sr-speedbar-select-window ()
