@@ -665,25 +665,34 @@ If WINDOW is nil, return the width of the current window."
 ;; (advice-add 'switch-to-buffer :before-while 
 ;; 	    'sr-speedbar--switch-to-buffer-advice)
 
-(defun sr-speedbar--set-window-buffer--advice 
-    (window buffer-or-name &optional keep-margins)
+(defun sr-speedbar--set-window-buffer--advice (args)
   "Ensure that at most one window displays the sr-speedbar's buffer.
 
-This is accomplished by throwing an error when trying to 
-set the buffer of another window to sr-speedbar's while 
+This is accomplished by changing BUFFER-OR-NAME when attempting to
+set the buffer of WINDOW to sr-speedbar's while
 another window is already displaying it.
 
-Along with the `sr-speedbar--window-configuration-change-hook',
-they ensure that at most one window displays the sr-speedbar's buffer.
-
-This function should advise `set-window-buffer'."
-  (let ((sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
-	(new-buffer (get-buffer buffer-or-name)))
-    (and sr-speedbar-buffer
-	 (when (and (sr-speedbar-window) (eq new-buffer sr-speedbar-buffer))
-	   (error "Another sr-speedbar window exists")))))
-(advice-add 'set-window-buffer :before
-	    'sr-speedbar--set-window-buffer--advice)
+This function should advise `set-window-buffer' by filtering its arguments
+and thus expects the same arguments as the adviced function
+packed in a list passed to ARGS."
+  (let ((window (nth 0 args))
+        (buffer-or-name (nth 1 args))
+        (keep-margins (nth 2 args)))
+    (let ((sr-speedbar-buffer (get-buffer sr-speedbar-buffer-name))
+	  (new-buffer (get-buffer buffer-or-name)))
+      (when sr-speedbar-buffer
+	(when (and (sr-speedbar-window) (eq new-buffer sr-speedbar-buffer))
+	  (setq buffer-or-name
+		(get-next-valid-buffer (buffer-list) sr-speedbar-buffer))
+	  ;; Handle the extreme case where BUFFER-OR-NAME
+	  ;; is already WINDOW's current buffer AND is being killed.
+	  (when (or (eq (window-buffer window) buffer-or-name)
+		    (not buffer-or-name))
+	    (setq buffer-or-name
+		  (get-buffer-create (generate-new-buffer-name "*scratch*"))))))
+      (list window buffer-or-name keep-margins))))
+(advice-add 'set-window-buffer :filter-args
+            'sr-speedbar--set-window-buffer--advice)
 
 (defun sr-speedbar--delete-window--advice (&optional window)
   "Save `sr-speedbar-window''s size before killing it."
