@@ -695,15 +695,28 @@ store the current width of the window to `sr-speedbar-width'.
 
 This function should advice `delete-window' by surrounding it and thus
 expects the original function ORIGINAL followed by its arguments."
-  (let (win)
-    (setq win (or window (selected-window)))
-    (when (eq win (sr-speedbar-window))
-      (sr-speedbar-remember-window-width)
+  (let (win srwin)
+    (setq win (or window (selected-window))
+	  srwin (sr-speedbar-window))
+    ;; When:
+    ;; * only two windows remain,
+    ;; * the one of them is sr-speedbar-window, and
+    ;; * the other window is killed,
+    ;; prevent sr-speedbar-window from becoming the frame's root window
+    ;; (its size constraints make things complicated when splitting, etc...)
+    (if (and srwin
+	     (not (eq win srwin))
+	     (eq (length (window-list)) 2))
+	(error "Cannot delete the only window other than `sr-speedbar-window'")
+      ;; Store width of sr-speedbar-window before killing it.
+      (when (eq win srwin)
+	(sr-speedbar-remember-window-width))
       (apply original (list window))
       ;; No point in keeping the buffer alive
       ;; (user may accidentally switch to it in a non-dedicated window).
-      (kill-buffer sr-speedbar-buffer-name)))
-  )
+      (when (eq win srwin)
+	(kill-buffer sr-speedbar-buffer-name)))
+    ))
 (advice-add 'delete-window :around 'sr-speedbar--delete-window--advice)
 
 ;; (defadvice pop-to-buffer (before sr-speedbar-pop-to-buffer-advice activate)
