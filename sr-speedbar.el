@@ -559,7 +559,9 @@ Otherwise return nil."
 
 (defun sr-speedbar-window-size-change-hook ()
   "Ensure that the size of the sr-speedbar window is within specified limits."
-  (when (sr-speedbar-window-exists-p)
+  ;; Determine if we should resize sr-speedbar-window only if
+  ;; sr-speedbar-window exists AND is not the only window of the current frame.
+  (when (and (sr-speedbar-window-exists-p) (> (length (window-list)) 1))
     (save-selected-window
       (select-window (sr-speedbar-window))
       (let ((win-width (sr-speedbar-get-window-width)))
