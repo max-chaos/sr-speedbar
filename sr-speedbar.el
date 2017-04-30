@@ -407,8 +407,8 @@ of a speedbar-window.  It will be created if necessary."
         (sr-speedbar-handle-other-window-advice sr-speedbar-skip-other-window-p)
         ;; Switch buffer
         (unless (sr-speedbar-buffer-exists-p)
-          (when (<= (sr-speedbar-current-window-take-width) sr-speedbar-width)
-	    (setq sr-speedbar-width sr-speedbar-default-width))
+          (when (<= (sr-speedbar-get-window-width) sr-speedbar-width)
+            (setq sr-speedbar-width sr-speedbar-default-width))
           (setq speedbar-buffer (get-buffer-create sr-speedbar-buffer-name)
                 speedbar-frame (selected-frame)
                 dframe-attached-frame (selected-frame)
@@ -449,6 +449,8 @@ of a speedbar-window.  It will be created if necessary."
 	;; 
         ;;(set-window-dedicated-p sr-speedbar-new-window t)
 	;; Switch to initially selected window.
+	;; Fix the size of every window displaying the speedbar buffer.
+	(setq-local window-size-fixed 'width)
         (select-window current-window))
     (message "`sr-speedbar' has been created.")))
 
@@ -520,7 +522,7 @@ Otherwise return nil."
 (defun sr-speedbar-remember-window-width ()
   "Remember window width."
   (when (sr-speedbar-current-window-p)
-    (let ((win-width (sr-speedbar-current-window-take-width)))
+    (let ((win-width (sr-speedbar-get-window-width)))
       (if (> win-width 1)
 	  (if (<= win-width sr-speedbar-max-width)
 	      (setq sr-speedbar-width win-width)
@@ -560,10 +562,10 @@ Otherwise return nil."
   (when (sr-speedbar-window-exists-p)
     (save-selected-window
       (select-window (sr-speedbar-window))
-      (let ((win-width (sr-speedbar-current-window-take-width)))
-	(when (>= win-width sr-speedbar-max-width)
-	  ;; (window-resize nil 0 (- sr-speedbar-max-width win-width)))))))
-	  (shrink-window-horizontally (- win-width sr-speedbar-max-width)))))))
+      (let ((win-width (sr-speedbar-get-window-width)))
+        (when (>= win-width sr-speedbar-max-width)
+          ;; (window-resize nil 0 (- sr-speedbar-max-width win-width)))))))
+          (shrink-window-horizontally (- win-width sr-speedbar-max-width)))))))
 
 ;; (defun sr-speedbar--window-configuration-change-hook ()
 ;;   "Automatically detect when the sr-speedbar buffer
@@ -597,11 +599,34 @@ Will display message if ECHO-SHOW is non-nil."
     (remove-hook 'speedbar-timer-hook 'sr-speedbar-refresh)
     (if echo-show (message "Turn off speedbar content refresh automatically."))))
 
-(defun sr-speedbar-current-window-take-width (&optional window)
-  "Return the width that WINDOW take up.
-If WINDOW is nil, get current window."
+(defun sr-speedbar--get-window-width (&optional window)
+  "Return the width of WINDOW.
+
+If WINDOW is nil, return the width of the current window."
   (let ((edges (window-edges window)))
     (- (nth 2 edges) (nth 0 edges))))
+
+(defun sr-speedbar-get-window-width ()
+  "Get the width of sr-speedbar-window."
+  (interactive)
+  (if (sr-speedbar-window-exists-p)
+      (sr-speedbar--get-window-width (sr-speedbar-window))
+    sr-speedbar-width)
+  )
+
+(defun sr-speedbar-set-window-width (width)
+  "Set the width of sr-speedbar-window to WIDTH."
+  (interactive "nWidth:")
+  (if (sr-speedbar-window-exists-p)
+      (save-selected-window
+	(select-window (sr-speedbar-window))
+	(let* ((delta (- width (sr-speedbar--get-window-width))))
+	  (setq window-size-fixed nil)
+	  (if (> delta 0)
+	      (enlarge-window-horizontally delta)
+	    (shrink-window-horizontally (- delta)))
+	  (setq window-size-fixed 'width)))
+    (setq sr-speedbar-width width)))
 
 (defun sr-speedbar-window-dedicated-only-one-p ()
   "Only have one non-dedicated window."
@@ -712,6 +737,12 @@ Such cases are:
   in the middle of establishing a connection using TRAMP)"
   (not (minibufferp)))
 (advice-add 'speedbar-timer-fn :before-while 'speedbar--inhibit-update--advice)
+
+;; Obsolete functions, variables...
+(define-obsolete-function-alias
+  'sr-speedbar-current-window-take-width
+  'sr-speedbar--get-window-width
+  "2017-04-27 18:08")
 
 (provide 'sr-speedbar)
 
