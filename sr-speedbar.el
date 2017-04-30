@@ -620,12 +620,13 @@ If WINDOW is nil, return the width of the current window."
   (if (sr-speedbar-window-exists-p)
       (save-selected-window
 	(select-window (sr-speedbar-window))
-	(let* ((delta (- width (sr-speedbar--get-window-width))))
+	(let* ((delta (- width (sr-speedbar--get-window-width)))
+	       (size-state window-size-fixed))
 	  (setq window-size-fixed nil)
 	  (if (> delta 0)
 	      (enlarge-window-horizontally delta)
 	    (shrink-window-horizontally (- delta)))
-	  (setq window-size-fixed 'width)))
+	  (setq window-size-fixed size-state)))
     (setq sr-speedbar-width width)))
 
 (defun sr-speedbar-window-dedicated-only-one-p ()
