@@ -358,6 +358,11 @@ Default is nil."
              (sr-speedbar-handle-other-window-advice value))))
   :group 'sr-speedbar)
 
+(defcustom sr-speedbar-kill-buffer-with-window t
+  "If non-nil, kill the buffer *SPEEDBAR* along with the sr-speedbar window."
+  :type 'boolean
+  :group 'sr-speedbar)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Constant ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defconst sr-speedbar-buffer-name "*SPEEDBAR*"
   "The buffer name of sr-speedbar.")
@@ -712,11 +717,10 @@ expects the original function ORIGINAL followed by its arguments."
       (when (eq win srwin)
 	(sr-speedbar-remember-window-width))
       (apply original (list window))
-      ;; No point in keeping the buffer alive
-      ;; (user may accidentally switch to it in a non-dedicated window).
-      (when (eq win srwin)
-	(kill-buffer sr-speedbar-buffer-name)))
-    ))
+      ;; No point in keeping the buffer alive as
+      ;; user may accidentally switch to it in a non-dedicated window.
+      (when (and (eq win srwin) sr-speedbar-kill-buffer-with-window)
+	(kill-buffer sr-speedbar-buffer-name)))))
 (advice-add 'delete-window :around 'sr-speedbar--delete-window--advice)
 
 ;; (defadvice pop-to-buffer (before sr-speedbar-pop-to-buffer-advice activate)
