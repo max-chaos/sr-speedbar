@@ -723,6 +723,19 @@ expects the original function ORIGINAL followed by its arguments."
 	(kill-buffer sr-speedbar-buffer-name)))))
 (advice-add 'delete-window :around 'sr-speedbar--delete-window--advice)
 
+(defun sr-speedbar--balance-windows--advice (original &optional window-or-frame)
+  "Enable window size balancing despite the fixed size of sr-speedbar-window.
+
+This function should advice `balance-windows' by surrounding it and thus
+expects the original function ORIGINAL followed by
+its optional argument WINDOW-OR-FRAME."
+  (when (sr-speedbar-window-exists-p)
+    (let ((sr-speedbar-kill-buffer-with-window nil))
+      (sr-speedbar-close)
+      (apply original (list window-or-frame))
+      (sr-speedbar-open))))
+(advice-add 'balance-windows :around 'sr-speedbar--balance-windows--advice)
+
 ;; (defadvice pop-to-buffer (before sr-speedbar-pop-to-buffer-advice activate)
 ;;   "This advice is to fix `pop-to-buffer' problem with dedicated window.
 ;; Default, function `display-buffer' can't display buffer in select window
