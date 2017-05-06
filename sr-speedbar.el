@@ -400,66 +400,71 @@ of a speedbar-window.  It will be created if necessary."
 (defun sr-speedbar-open ()
   "Create `sr-speedbar' window."
   (interactive)
-  ;; Toggle ECB window when ECB window activated.
+  ;; Do not use sr-speedbar with ecb because it behaves weirdly.
   (when (and (featurep 'ecb) ecb-activated-window-configuration)
-    (error "Module sr-speedbar has been disabled while ECB is on"))
-  (if (not (sr-speedbar-window-exists-p))
-      (let ((sr-speedbar-new-window
-             (or (sr-speedbar-window) (sr-speedbar-create-window)))
-            (current-window (selected-window)))
-        ;; Ensure only one window is there
-        ;; when `sr-speedbar-delete-windows' is non-nil.
-        (when sr-speedbar-delete-windows (delete-other-windows))
-        ;; Whether activate `other-window' advice
-        ;; to skip `sr-speedbar' window when use `other-window'.
-        (sr-speedbar-handle-other-window-advice sr-speedbar-skip-other-window-p)
-        ;; Switch buffer
-        (unless (sr-speedbar-buffer-exists-p)
-          (when (<= (sr-speedbar-get-window-width) sr-speedbar-width)
-            (setq sr-speedbar-width sr-speedbar-default-width))
-          (setq speedbar-buffer (get-buffer-create sr-speedbar-buffer-name)
-                speedbar-frame (selected-frame)
-                dframe-attached-frame (selected-frame)
-                speedbar-select-frame-method 'attached
-                ;; Keep verbosity down to a minimum.
-                speedbar-verbosity-level 0
-                speedbar-last-selected-file nil)
-          (set-buffer speedbar-buffer)
-          ;; Disable undo in speedbar buffer,
-          ;; otherwise an `undo-outer-limit' error may occur.
-          (buffer-disable-undo speedbar-buffer)
-          (speedbar-mode)
-          (speedbar-reconfigure-keymaps)
-          (speedbar-update-contents)
-          (speedbar-set-timer 1)
-          ;; Add speedbar hook.
-          (add-hook 'speedbar-before-visiting-file-hook 'sr-speedbar-before-visiting-file-hook t)
-          (add-hook 'speedbar-before-visiting-tag-hook 'sr-speedbar-before-visiting-tag-hook t)
-          (add-hook 'speedbar-visiting-file-hook 'sr-speedbar-visiting-file-hook t)
-          (add-hook 'speedbar-visiting-tag-hook 'sr-speedbar-visiting-tag-hook t)
-          ;; Add window configuration related hooks.
-          (add-hook 'window-configuration-change-hook 'sr-speedbar-window-size-change-hook)
-          ;; Add `kill-buffer-hook'.
-          (add-hook 'kill-buffer-hook 'sr-speedbar-kill-buffer-hook)
-          ;; Enable automatic update of `sr-speedbar-window''s value
-          ;; when window configuration changes.
-          ;;(add-hook 'window-configuration-change-hook
-          ;;          'sr-speedbar--window-configuration-change-hook)
-          ;; Auto refresh speedbar content
-          ;; if option `sr-speedbar-auto-refresh' is non-nil
-          (sr-speedbar-handle-auto-refresh sr-speedbar-auto-refresh))
-        (set-window-buffer sr-speedbar-new-window (get-buffer sr-speedbar-buffer-name))
-        ;; Dedicate `sr-speedbar-window' to speedbar-buffer.
-        ;;
-        ;; In the end, do not make this window dedicated as
-        ;; Emacs' window splitting mechanism behaves peculiarly
-        ;; when dedicated windows are present.
-        ;;
-        (set-window-dedicated-p sr-speedbar-new-window t)
+    (error "`sr-speedbar' cannot be used while ECB is on"))
+  (when (not (sr-speedbar-window-exists-p))
+    (let ((sr-speedbar-new-window
+	   (or (sr-speedbar-window) (sr-speedbar-create-window)))
+	  (current-window (selected-window)))
+      ;; Ensure only one window is there
+      ;; when `sr-speedbar-delete-windows' is non-nil.
+      (when sr-speedbar-delete-windows (delete-other-windows))
+      ;; Whether activate `other-window' advice
+      ;; to skip `sr-speedbar' window when use `other-window'.
+      (sr-speedbar-handle-other-window-advice sr-speedbar-skip-other-window-p)
+      ;; Switch buffer
+      (unless (sr-speedbar-buffer-exists-p)
+	(setq speedbar-buffer (get-buffer-create sr-speedbar-buffer-name)
+	      speedbar-frame (selected-frame)
+	      dframe-attached-frame (selected-frame)
+	      speedbar-select-frame-method 'attached
+	      ;; Keep verbosity down to a minimum.
+	      speedbar-verbosity-level 0
+	      speedbar-last-selected-file nil)
+	(with-current-buffer speedbar-buffer
+	  ;; Disable undo in speedbar buffer,
+	  ;; otherwise an `undo-outer-limit' error may occur.
+	  (buffer-disable-undo speedbar-buffer)
+	  (speedbar-mode)
+	  (speedbar-reconfigure-keymaps)
+	  (speedbar-update-contents)
+	  (speedbar-set-timer 1)
+	  ;; Add speedbar hook.
+	  (add-hook 'speedbar-before-visiting-file-hook
+		    'sr-speedbar-before-visiting-file-hook t)
+	  (add-hook 'speedbar-before-visiting-tag-hook
+		    'sr-speedbar-before-visiting-tag-hook t)
+	  (add-hook 'speedbar-visiting-file-hook
+		    'sr-speedbar-visiting-file-hook t)
+	  (add-hook 'speedbar-visiting-tag-hook
+		    'sr-speedbar-visiting-tag-hook t)
+	  ;; Add window configuration related hooks.
+	  (add-hook 'window-configuration-change-hook
+		    'sr-speedbar-window-size-change-hook)
+	  ;; Add `kill-buffer-hook'.
+	  (add-hook 'kill-buffer-hook
+		    'sr-speedbar-kill-buffer-hook)
+	  ;; Enable automatic update of `sr-speedbar-window''s value
+	  ;; when window configuration changes.
+	  ;;(add-hook 'window-configuration-change-hook
+	  ;;          'sr-speedbar--window-configuration-change-hook)
+	  ;; Auto refresh speedbar content
+	  ;; if option `sr-speedbar-auto-refresh' is non-nil
+	  (sr-speedbar-handle-auto-refresh sr-speedbar-auto-refresh)))
+      (with-current-buffer (get-buffer sr-speedbar-buffer-name)
+	(set-window-buffer sr-speedbar-new-window (current-buffer))
+	;; Dedicate `sr-speedbar-window' to speedbar-buffer.
+	;;
+	;; In the end, do not make this window dedicated as
+	;; Emacs' window splitting mechanism behaves peculiarly
+	;; when dedicated windows are present.
+	;;
+	(set-window-dedicated-p sr-speedbar-new-window t)
 	;; Fix the size of every window displaying the speedbar buffer.
-	(setq-local window-size-fixed 'width)
-        ;; Switch to initially selected window.
-        (select-window current-window))
+	(setq-local window-size-fixed 'width))
+      ;; Switch to initially selected window.
+      (select-window current-window))
     (message "`sr-speedbar' has been created.")))
 
 ;;;###autoload
