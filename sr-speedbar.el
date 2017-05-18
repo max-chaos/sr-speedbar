@@ -734,11 +734,12 @@ expects the original function ORIGINAL followed by its arguments."
 This function should advice `balance-windows' by surrounding it and thus
 expects the original function ORIGINAL followed by
 its optional argument WINDOW-OR-FRAME."
-  (when (sr-speedbar-window-exists-p)
+  (if (sr-speedbar-window-exists-p)
     (let ((sr-speedbar-kill-buffer-with-window nil))
       (sr-speedbar-close)
       (apply original (list window-or-frame))
-      (sr-speedbar-open))))
+      (sr-speedbar-open))
+    (apply original (list window-or-frame))))
 (advice-add 'balance-windows :around 'sr-speedbar--balance-windows--advice)
 
 ;; (defadvice pop-to-buffer (before sr-speedbar-pop-to-buffer-advice activate)
