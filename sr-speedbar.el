@@ -358,14 +358,11 @@ Default is nil."
              (sr-speedbar-handle-other-window-advice value))))
   :group 'sr-speedbar)
 
-(defcustom sr-speedbar-kill-buffer-with-window t
-  "If non-nil, kill the buffer *SPEEDBAR* along with the sr-speedbar window."
-  :type 'boolean
-  :group 'sr-speedbar)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Constant ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defconst sr-speedbar-buffer-name "*SPEEDBAR*"
-  "The buffer name of sr-speedbar.")
+(defconst sr-speedbar-buffer-name " *SPEEDBAR* "
+  "The buffer name of sr-speedbar.
+
+The name should begin with a space, in order to make buffer hidden.")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Variables ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defvar sr-speedbar-width sr-speedbar-default-width
@@ -721,11 +718,7 @@ expects the original function ORIGINAL followed by its arguments."
       ;; Store width of sr-speedbar-window before killing it.
       (when (eq win srwin)
 	(sr-speedbar-remember-window-width))
-      (apply original (list window))
-      ;; No point in keeping the buffer alive as
-      ;; user may accidentally switch to it in a non-dedicated window.
-      (when (and (eq win srwin) sr-speedbar-kill-buffer-with-window)
-	(kill-buffer sr-speedbar-buffer-name)))))
+      (apply original (list window)))))
 (advice-add 'delete-window :around 'sr-speedbar--delete-window--advice)
 
 (defun sr-speedbar--balance-windows--advice (original &optional window-or-frame)
