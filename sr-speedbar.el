@@ -518,13 +518,12 @@ Otherwise return nil."
 
 (defun sr-speedbar-remember-window-width ()
   "Remember window width."
-  (when (sr-speedbar-current-window-p)
-    (let ((win-width (sr-speedbar-get-window-width)))
-      (if (> win-width 1)
-          (if (<= win-width sr-speedbar-max-width)
-              (setq sr-speedbar-width win-width)
-            (setq sr-speedbar-width sr-speedbar-max-width))
-        (setq sr-speedbar-width sr-speedbar-default-width)))))
+  (let ((win-width (sr-speedbar-get-window-width)))
+    (if (> win-width 1)
+        (if (<= win-width sr-speedbar-max-width)
+            (setq sr-speedbar-width win-width)
+          (setq sr-speedbar-width sr-speedbar-max-width))
+      (setq sr-speedbar-width sr-speedbar-default-width))))
 
 (defun sr-speedbar-before-visiting-file-hook ()
   "Function that hook `speedbar-before-visiting-file-hook'."
